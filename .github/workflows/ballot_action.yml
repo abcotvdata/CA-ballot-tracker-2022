@@ -1,0 +1,23 @@
+on:
+    schedule:
+     - cron: '5 4 * * *'
+    workflow_dispatch:
+
+name: Ballot Tracker 2022
+  
+jobs:
+  render:
+    name: Pull latest ballot return data and render it 
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: r-lib/actions/setup-r@v2
+      - name: Install dependencies and packages
+        run: Rscript -e 'install.packages(c("tidyverse","janitor", "readxl", "openxlsx", "XLConnect"))'
+      - name: Get ballot return data
+        run: Rscript scripts/ballots-returned-tracker.Rmd
+      - name: Commit results
+        run: |
+          git add -A
+          git commit -m 'Update returned ballots tracker' || echo "No changes"
+          git push origin || echo "No changes to commit"
