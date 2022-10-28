@@ -150,7 +150,9 @@ counties <- c("Alameda","Alpine","Amador","Butte","Calaveras","Colusa","Contra C
 
 ```{r, echo=FALSE, warning=FALSE, message=FALSE}
 
-today <- Sys.Date() #get todays date
+today_UTC <- as.POSIXct(Sys.time()) #get todays date as UTC
+today_posix <- format(today_UTC, tz="America/Los_Angeles",usetz=TRUE)
+today <- as.Date(substr(as.character(today_posix), 1,10))
 yesterday <- as.Date(today-1) #get yesterday's date
 filename <- paste(sep="", "vbm-statistics_",yesterday,".xlsm") #put yesterdays date into filename
 
