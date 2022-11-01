@@ -1,6 +1,6 @@
 on:
     schedule:
-     - cron: '30 21 * * 1-5'
+     - cron: '30 21,23 * * 1-5'
     workflow_dispatch:
 
 name: Ballot Tracker 2022
