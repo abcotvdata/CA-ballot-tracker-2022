@@ -176,11 +176,7 @@ ballots <- ballots[-row_with_names,] #drop that same row
 ballots_clean <- ballots %>% 
   select(`COUNTY`, `Total voters Issued VBM ballots`,`Total Accepted VBM ballots`, `Drop Box`, `Drop Off Location`, `Vote Center Drop Off`, `Mail`, `FAX`, `Other`) %>%  #select only the columns we need
   filter(`COUNTY` %in% counties) %>%  #filter out only the rows that have county names
-  mutate( across(
-        .cols = everything(),
-        ~replace_na( ., 0 ) #replace everything that's "NULL" with a "0"
-    ) ) %>% 
-  
+  mutate_all(funs(replace_na(.,0))) %>%  #replace everything that's "NULL" with a "0" 
   mutate(`Total voters Issued VBM ballots`= as.numeric(`Total voters Issued VBM ballots`),
          `Total Accepted VBM ballots` = as.numeric(`Total Accepted VBM ballots`), 
          `Drop Box` = as.numeric(`Drop Box`), 
