@@ -1,0 +1,284 @@
+---
+title: "ballots-returned-tracker"
+
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(janitor)
+library(readxl)
+library(openxlsx)
+library(XLConnect)
+library(stringr)
+
+```
+
+```{css, echo=FALSE}
+
+h1.title {
+  font-family: roboto;
+  color: transparent;
+  font-weight: 700;
+  text-align: left;
+  font-size: 12px;
+  padding: 0px;
+  height: 0px;
+}
+
+.footer {
+  #font-family: roboto;
+  color: black;
+  text-align: left;
+  font-size: 12px;
+    padding: 5px;
+  font-style: italic;
+}
+
+h1 {
+  #font-family: roboto;
+  color: black;
+  font-weight: bolder;
+  text-align: center;
+  font-size: 36px;
+  margin-top: 0;
+  margin-bottom: 30px;
+  
+}
+h2 {
+  #font-family: roboto;
+  font-weight: 500;
+  color: black;
+  text-align: center;
+  font-size: 18px;
+  margin-top: 0;
+  margin-bottom: 2;
+}
+.bignumber {
+  #font-family: roboto;
+  color: white;
+  font-weight: 900;
+  text-align: center;
+  font-size: 40px;
+  line-height: 65px;
+  height: 65px;
+  margin-top: 0;
+  margin-bottom: 0;
+}
+body {
+  color: black;
+  #font-family: roboto;
+  font-weight: 400;
+  font-size: 18px;
+}
+h4 {
+  font-size: 14px;
+  font-style: italic;
+  text-align: center;
+}
+  
+   * {
+      box-sizing: border-box;
+   }
+   .card {
+      color: white;
+      float: left;
+      width: calc(20% - 10px);
+      padding: 5px;
+      border-radius: 10px;
+      margin-left: 3px;
+      margin-right: 3px;
+      margin-top: 3px;
+      margin-bottom: 3px;
+      height: 100%;
+   }
+   .card p {
+     #font-family: roboto;
+     text-align: center;
+     font-size: 14px;
+     margin-bottom: 0;
+   }
+   .cardContainer:after {
+      content: "";
+      display: table;
+      clear: both;
+   }
+   
+   @media screen and (max-width: 760px) {
+      .bignumber {
+         font-size: 32px;
+      }
+     
+     .card p {
+         font-size: 13px;
+      }
+
+
+   }
+   
+   @media screen and (max-width: 650px) {
+      .card {
+         width: 100%;
+      }
+      h1.title {
+        font-size: 22px;
+      }
+      
+      .bignumber {
+         font-size: 35px;
+      }
+     
+     .card p {
+         font-size: 14px;
+      }
+      
+      
+   }
+```
+
+```{r, echo=FALSE, warning=FALSE}
+
+
+```
+
+```{r, echo=FALSE, warning=FALSE}
+
+counties <- c("Alameda","Alpine","Amador","Butte","Calaveras","Colusa","Contra Costa","Del Norte","El Dorado","Fresno","Glenn","Humboldt","Imperial","Inyo","Kern","Kings","Lake","Lassen","Los Angeles","Madera","Marin","Mariposa","Mendocino","Merced","Modoc","Mono","Monterey","Napa","Nevada","Orange","Placer","Plumas","Riverside","Sacramento","San Benito","San Bernardino","San Diego","San Francisco","San Joaquin","San Luis Obispo","San Mateo","Santa Barbara","Santa Clara","Santa Cruz","Shasta","Sierra","Siskiyou","Solano","Sonoma","Stanislaus","Sutter","Tehama","Trinity","Tulare","Tuolumne","Ventura","Yolo","Yuba")
+
+```
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+
+today_UTC <- as.POSIXct(Sys.time()) #get todays date as UTC
+today_posix <- format(today_UTC, tz="America/Los_Angeles",usetz=TRUE)
+today <- as.Date(substr(as.character(today_posix), 1,10))
+yesterday <- as.Date(today-1) #get yesterday's date
+filename <- paste(sep="", "vbm-statistics_",yesterday,".xlsm") #put yesterdays date into filename
+
+#pretty dates
+today_display <- format(today, "%A, %b. %d, %Y")
+
+download.file("https://elections.cdn.sos.ca.gov/statewide-elections/2022-general/vbm-statistics.xlsm", filename) #download file
+
+ballots <- read_excel(filename) #read file
+
+row_with_names <- as.numeric(which(grepl("COUNTY", ballots$...1))) #which row has the actual column names
+
+names(ballots) <- ballots[row_with_names,] #fill in the column names with the actual columnn names from that row
+ballots <- ballots[-row_with_names,] #drop that same row
+
+```
+
+```{r, echo=FALSE, warning=FALSE}
+
+ballots_clean <- ballots %>% 
+  select(`COUNTY`, `Total voters Issued VBM ballots`,`Total Accepted VBM ballots`, `Drop Box`, `Drop Off Location`, `Vote Center Drop Off`, `Mail`, `FAX`, `Other`) %>%  #select only the columns we need
+  filter(`COUNTY` %in% counties) %>%  #filter out only the rows that have county names
+  mutate_all(funs(replace_na(.,0))) %>%  #replace everything that's "NULL" with a "0" 
+  mutate(`Total voters Issued VBM ballots`= as.numeric(`Total voters Issued VBM ballots`),
+         `Total Accepted VBM ballots` = as.numeric(`Total Accepted VBM ballots`), 
+         `Drop Box` = as.numeric(`Drop Box`), 
+         `Drop Off Location` = as.numeric(`Drop Off Location`), 
+         `Vote Center Drop Off` = as.numeric(`Vote Center Drop Off`), 
+         `Mail`= as.numeric(`Mail`), 
+         `FAX` = as.numeric(`FAX`), 
+         `Other` = as.numeric(`Other`)) %>% #convert them all to numbers
+  rename(`Ballots issued`=`Total voters Issued VBM ballots`,
+         `Ballots accepted`=`Total Accepted VBM ballots`,
+         County = `COUNTY`) %>% 
+  mutate(`Ballots returned` = `Drop Box` + `Drop Off Location` + `Vote Center Drop Off` + `Mail` + `FAX` + `Other`) %>% #get a number for the total ballots returned
+  mutate(`% returned` = round(((`Ballots returned`/`Ballots issued`)*100), digits=2)) %>%  #percent that have been returned
+  mutate(`% accepted` = round(((`Ballots accepted`/`Ballots issued`)*100), digits=2))
+
+write.csv(ballots_clean, "ballots_clean.csv", row.names = FALSE)
+
+```
+
+```{r, echo=FALSE, warning=FALSE}
+
+total_ballots_issued = sum(ballots_clean$`Ballots issued`)
+total_ballots_returned = sum(ballots_clean$`Ballots returned`)
+total_ballots_accepted = sum(ballots_clean$`Ballots accepted`)
+total_pct_returned = round(((total_ballots_returned/total_ballots_issued)*100), digits=1)
+total_pct_accepted = round(((total_ballots_accepted/total_ballots_issued)*100), digits=1)
+
+if (total_ballots_issued > 1000000) {
+  total_ballots_issued_display = paste(sep="", as.character(round((total_ballots_issued/1000000), digits=1)), " M")
+} else {
+  total_ballots_issued_display = paste(sep="", as.character(round((total_ballots_issued/1000), digits=1)), " K")
+}
+
+
+if (total_ballots_returned > 1000000) {
+  total_ballots_returned_display = paste(sep="", as.character(round((total_ballots_returned/1000000), digits=1)), " M")
+} else {
+  total_ballots_returned_display = paste(sep="", as.character(round((total_ballots_returned/1000), digits=1)), " K")
+}
+
+if (total_ballots_accepted > 1000000) {
+  total_ballots_accepted_display = paste(sep="", as.character(round((total_ballots_accepted/1000000), digits=1)), " M")
+} else {
+  total_ballots_accepted_display = paste(sep="", as.character(round((total_ballots_accepted/1000), digits=1)), " K")
+}
+
+
+```
+
+<h1>California Ballot Tracker</h1>
+<h4>Last updated `r today_display` </h4>
+
+<div class="cardContainer">
+<div class="card" style="background-color:#00318b;">
+<p>Ballots issued<br>
+<span class="bignumber">`r total_ballots_issued_display`<br></span>
+</div>
+<div class="card" style="background-color:#00318b;">
+<p>Ballots returned<br>
+<span class="bignumber">`r total_ballots_returned_display`<br></span>
+</div>
+<div class="card" style="background-color:#00318b;">
+<p>Ballots accepted<br>
+<span class="bignumber">`r total_ballots_accepted_display`<br></span>
+</div>
+<div class="card" style="background-color:#00318b;">
+<p>% returned<br>
+<span class="bignumber">`r total_pct_returned`%<br></span><p>
+</div>
+<div class="card" style="background-color:#00318b;">
+<p>% accepted<br>
+<span class="bignumber">`r total_pct_accepted`%<br></span><p>
+</div>
+</div>
+
+<br>
+<br>
+
+
+<iframe title="Ballots returned and accepted by county" aria-label="Map" id="datawrapper-chart-8PQ2q" src="https://datawrapper.dwcdn.net/8PQ2q/1/" scrolling="no" frameborder="0" style="width: 0; min-width: 100% !important; border: none;" height="711" data-external="1"></iframe><script type="text/javascript">!function(){"use strict";window.addEventListener("message",(function(e){if(void 0!==e.data["datawrapper-height"]){var t=document.querySelectorAll("iframe");for(var a in e.data["datawrapper-height"])for(var r=0;r<t.length;r++){if(t[r].contentWindow===e.source)t[r].style.height=e.data["datawrapper-height"][a]+"px"}}}))}();
+</script>
+
+<br>
+<br>
+
+<iframe title="Search for your county" aria-label="Dot Plot" id="datawrapper-chart-ycOwi" src="https://datawrapper.dwcdn.net/ycOwi/1/" scrolling="no" frameborder="0" style="width: 0; min-width: 100% !important; border: none;" height="525" data-external="1"></iframe><script type="text/javascript">!function(){"use strict";window.addEventListener("message",(function(e){if(void 0!==e.data["datawrapper-height"]){var t=document.querySelectorAll("iframe");for(var a in e.data["datawrapper-height"])for(var r=0;r<t.length;r++){if(t[r].contentWindow===e.source)t[r].style.height=e.data["datawrapper-height"][a]+"px"}}}))}();
+</script>
+
+<br>
+<br>
+<div class="footer">Built and designed by Grace Manthey and Lindsey Feingold. Source: <a href="https://www.sos.ca.gov/elections/upcoming-elections/general-election-nov-8-2022" target="_blank">California Secretary of State</a>. Data usually lags by about a day.</div>
+
+
+```{r, echo=FALSE, warning=FALSE}
+
+#trying to get date from header
+
+#x <- XLConnect::loadWorkbook("vbm-statistics.xlsm")
+#df <- XLConnect::readWorksheet(x, sheet=1)
+
+#sheet1 <- x$worksheets[[1]]
+
+#headers <- sheet1$headerFooter
+
+```
