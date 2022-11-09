@@ -12,6 +12,7 @@ library(janitor)
 library(readxl)
 library(openxlsx)
 library(XLConnect)
+library(stringr)
 
 ```
 
@@ -163,33 +164,35 @@ download.file("https://elections.cdn.sos.ca.gov/statewide-elections/2022-general
 
 ballots <- read_excel(filename) #read file
 
-row_with_names <- as.numeric(which(grepl("County Name", ballots$...1))) #which row has the actual column names
+row_with_names <- as.numeric(which(grepl("COUNTY", ballots$...1))) #which row has the actual column names
 
-names(ballots) <- ballots[3,] #fill in the column names with the actual columnn names from that row
+names(ballots) <- ballots[row_with_names,] #fill in the column names with the actual columnn names from that row
+ballots <- ballots[-row_with_names,] #drop that same row
 
 ```
 
 ```{r, echo=FALSE, warning=FALSE}
 
 ballots_clean <- ballots %>% 
-  filter(`County Name` %in% counties) %>%  #filter out only the rows that have county names
+  select(`COUNTY`, `Total voters Issued VBM ballots`,`Total Accepted VBM ballots`, `Drop Box`, `Drop Off Location`, `Vote Center Drop Off`, `Mail`, `FAX`, `Other`) %>%  #select only the columns we need
+  filter(`COUNTY` %in% counties) %>%  #filter out only the rows that have county names
   mutate( across(
         .cols = everything(),
-        ~str_replace( ., "NULL", "0" ) #replace everything that's "NULL" with a "0"
+        ~replace_na( ., 0 ) #replace everything that's "NULL" with a "0"
     ) ) %>% 
-  select(`County Name`, `Total VBM Ballots Issued (Distinct Voters)`,`Total VBM Ballots Accepted`, `Voter Returned - Drop Box`, `Voter Returned - Drop Off Location`, `Voter Returned - Vote Center Drop Off`, `Voter Returned - Mail`, `Voter Returned - FAX`, `Voter Returned - Other`) %>%  #select only the columns we need
-  mutate(`Total VBM Ballots Issued (Distinct Voters)`= as.numeric(`Total VBM Ballots Issued (Distinct Voters)`),
-         `Total VBM Ballots Accepted` = as.numeric(`Total VBM Ballots Accepted`), 
-         `Voter Returned - Drop Box` = as.numeric(`Voter Returned - Drop Box`), 
-         `Voter Returned - Drop Off Location` = as.numeric(`Voter Returned - Drop Off Location`), 
-         `Voter Returned - Vote Center Drop Off` = as.numeric(`Voter Returned - Vote Center Drop Off`), 
-         `Voter Returned - Mail`= as.numeric(`Voter Returned - Mail`), 
-         `Voter Returned - FAX` = as.numeric(`Voter Returned - FAX`), 
-         `Voter Returned - Other` = as.numeric(`Voter Returned - Other`)) %>% #convert them all to numbers
-  rename(`Ballots issued`=`Total VBM Ballots Issued (Distinct Voters)`,
-         `Ballots accepted`=`Total VBM Ballots Accepted`,
-         County = `County Name`) %>% 
-  mutate(`Ballots returned` = `Voter Returned - Drop Box` + `Voter Returned - Drop Off Location` + `Voter Returned - Vote Center Drop Off` + `Voter Returned - Mail` + `Voter Returned - FAX` + `Voter Returned - Other`) %>% #get a number for the total ballots returned
+  
+  mutate(`Total voters Issued VBM ballots`= as.numeric(`Total voters Issued VBM ballots`),
+         `Total Accepted VBM ballots` = as.numeric(`Total Accepted VBM ballots`), 
+         `Drop Box` = as.numeric(`Drop Box`), 
+         `Drop Off Location` = as.numeric(`Drop Off Location`), 
+         `Vote Center Drop Off` = as.numeric(`Vote Center Drop Off`), 
+         `Mail`= as.numeric(`Mail`), 
+         `FAX` = as.numeric(`FAX`), 
+         `Other` = as.numeric(`Other`)) %>% #convert them all to numbers
+  rename(`Ballots issued`=`Total voters Issued VBM ballots`,
+         `Ballots accepted`=`Total Accepted VBM ballots`,
+         County = `COUNTY`) %>% 
+  mutate(`Ballots returned` = `Drop Box` + `Drop Off Location` + `Vote Center Drop Off` + `Mail` + `FAX` + `Other`) %>% #get a number for the total ballots returned
   mutate(`% returned` = round(((`Ballots returned`/`Ballots issued`)*100), digits=2)) %>%  #percent that have been returned
   mutate(`% accepted` = round(((`Ballots accepted`/`Ballots issued`)*100), digits=2))
 
